@@ -1,41 +1,26 @@
 import streamlit as st
 from PIL import Image
-import easyocr
-import language_tool_python
-import tempfile
+from ocr import extract_text_from_image
+from spellcheck import check_spelling
 
-st.title("Õpilastöö automaatne kontroll (EasyOCR versioon)")
+st.title("Kirjaveakontroll õpilastöödele")
 
-# OCR-i laadimine ainult üks kord
-@st.cache_resource
-def load_reader():
-    st.info("Laen OCR mudelit... See võib võtta hetke ⏳")
-    return easyocr.Reader(['et'], gpu=False)
+uploaded_file = st.file_uploader("Lae üles pilt (.jpg või .png)", type=["jpg", "png"])
 
-reader = load_reader()
-
-uploaded_file = st.file_uploader("Lae üles pilt (JPG või PNG)", type=["jpg", "png"])
-
-if uploaded_file is not None:
+if uploaded_file:
     image = Image.open(uploaded_file)
     st.image(image, caption="Laetud töö", use_container_width=True)
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_file:
-        image.save(tmp_file.name)
-        tmp_path = tmp_file.name
+    with st.spinner("Tuvastan teksti..."):
+        text = extract_text_from_image(image)
+        st.subheader("Tuvastatud tekst:")
+        st.write(text)
 
-    st.subheader("Tuvastatud tekst:")
-    results = reader.readtext(tmp_path, detail=0)
-    extracted_text = "\n".join(results)
-    st.write(extracted_text)
-
-    st.subheader("Leitud kirjavead:")
-    tool = language_tool_python.LanguageTool('et')
-    matches = tool.check(extracted_text)
-
-    if matches:
-        for match in matches:
-            st.markdown(f"- **{match.context}**")
-            st.markdown(f"  ↪ {match.message} (_Soovitus: {match.replacements}_)")
-    else:
-        st.success("Kirjavigu ei tuvastatud! 👍")
+    with st.spinner("Kontrollin kirjavigu..."):
+        errors = check_spelling(text)
+        st.subheader("Leitud kirjavead:")
+        if errors:
+            for e in errors:
+                st.markdown(f"- **{e['context']}** → _{e['message']}_ (soovitus: {e['replacements']})")
+        else:
+            st.success("Kirjavigu ei tuvastatud!")
