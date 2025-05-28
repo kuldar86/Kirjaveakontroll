@@ -1,27 +1,27 @@
 import streamlit as st
 from PIL import Image
 import pytesseract
+import language_tool_python
 
-def extract_text(image):
-    return pytesseract.image_to_string(image, lang='est')
+st.title("Õpilastöö automaatne kontroll")
 
-st.set_page_config(page_title="Kirjaveakontroll", layout="centered")
-st.title("Kirjaveakontroll – v0.0.1")
+uploaded_file = st.file_uploader("Lae üles pilt (JPG või PNG)", type=["jpg", "png"])
 
-uploaded_file = st.file_uploader("Lae üles käsikirjaline etteütlus (.jpg/.png)", type=["jpg", "jpeg", "png"])
-
-if uploaded_file:
+if uploaded_file is not None:
     image = Image.open(uploaded_file)
-    st.image(image, caption="Laetud pilt", use_column_width=True)
+    st.image(image, caption="Laetud töö", use_column_width=True)
 
-    with st.spinner("Tuvastan teksti..."):
-        text = extract_text(image)
+    st.subheader("Tuvastatud tekst:")
+    extracted_text = pytesseract.image_to_string(image, lang='est')
+    st.write(extracted_text)
 
-    st.subheader("Tuvastatud tekst (OCR):")
-    st.text_area("OCR tulemus", text, height=200)
+    st.subheader("Leitud kirjavead:")
+    tool = language_tool_python.LanguageTool('et')
+    matches = tool.check(extracted_text)
 
-    # Näidisparandus
-    if "koolii" in text:
-        st.markdown("**Parandusettepanek:** `koolii → kooli`")
+    if matches:
+        for match in matches:
+            st.markdown(f"- **{match.context}**")
+            st.markdown(f"  ↪ {match.message} (_Soovitus: {match.replacements}_)")
     else:
-        st.markdown("_Parandusi ei tuvastatud selles demoversioonis._")
+        st.success("Kirjavigu ei tuvastatud! 👍")
